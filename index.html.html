@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Turnos Rehabilitación 2026 — GEA</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F4F0;color:#1A1A18;min-height:100vh}
+.screen{display:none;min-height:100vh}
+.screen.active{display:block}
+
+/* TOPBAR */
+.topbar{background:#fff;border-bottom:1px solid #E3E1D9;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:8px}
+.logo{font-size:15px;font-weight:700}.logo span{color:#7F77DD}
+.top-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.prof-chip{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500}
+.logout-btn{font-size:12px;color:#7A7870;cursor:pointer;text-decoration:underline;background:none;border:none;font-family:inherit}
+
+/* PANTALLA CARGA */
+.upload-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.upload-box{background:#fff;border:1px solid #E3E1D9;border-radius:16px;padding:36px 32px;max-width:480px;width:100%;text-align:center}
+.upload-icon{font-size:40px;margin-bottom:14px}
+.upload-title{font-size:20px;font-weight:700;margin-bottom:6px}
+.upload-sub{font-size:13px;color:#7A7870;margin-bottom:24px;line-height:1.6}
+.drop-area{border:2px dashed #C8C6BE;border-radius:12px;padding:28px 20px;cursor:pointer;transition:all .2s;margin-bottom:16px;position:relative}
+.drop-area:hover,.drop-area.over{border-color:#7F77DD;background:#F5F4FE}
+.drop-area-txt{font-size:13px;color:#7A7870;margin-bottom:10px}
+.drop-btn{padding:9px 22px;background:#7F77DD;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+.drop-btn:hover{background:#6B63C9}
+#fileInput{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-error{background:#FAECE7;border:1px solid #F0997B;border-radius:8px;padding:10px 14px;font-size:12px;color:#993C1D;margin-top:12px;display:none;text-align:left}
+.steps{display:flex;flex-direction:column;gap:6px;text-align:left;margin-top:16px;padding:14px;background:#F5F4F0;border-radius:10px}
+.step{font-size:12px;color:#7A7870;display:flex;gap:8px;align-items:flex-start}
+.step-num{background:#7F77DD;color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px}
+
+/* PANTALLA LOGIN */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:#fff;border:1px solid #E3E1D9;border-radius:16px;padding:36px 32px;max-width:380px;width:100%;text-align:center}
+.login-logo{font-size:22px;font-weight:700;margin-bottom:4px}.login-logo span{color:#7F77DD}
+.login-sub{font-size:13px;color:#7A7870;margin-bottom:28px}
+.pin-display{display:flex;gap:10px;justify-content:center;margin-bottom:20px}
+.pin-digit{width:52px;height:60px;border:2px solid #E3E1D9;border-radius:10px;font-size:24px;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center;color:#1A1A18;background:#F5F4F0;transition:border-color .15s}
+.pin-digit.active{border-color:#7F77DD;background:#fff}
+.pin-digit.filled{border-color:#A8A4E8;background:#fff}
+.pin-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.key{padding:14px;border:1px solid #E3E1D9;border-radius:10px;background:#fff;font-size:18px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .1s}
+.key:hover{background:#F5F4F0}
+.key:active{background:#E3E1D9;transform:scale(.97)}
+.key.del{font-size:14px;color:#7A7870}
+.key.empty{visibility:hidden}
+.pin-error{background:#FAECE7;border:1px solid #F0997B;border-radius:8px;padding:10px 14px;font-size:13px;color:#993C1D;margin-top:4px;display:none}
+.pin-hint{font-size:12px;color:#7A7870;margin-top:14px}
+.file-info-bar{background:#F5F4F0;border:1px solid #E3E1D9;border-radius:8px;padding:8px 14px;font-size:12px;color:#7A7870;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.file-dot{width:7px;height:7px;border-radius:50%;background:#1D9E75;display:inline-block;margin-right:5px;flex-shrink:0}
+.reload-link{font-size:12px;color:#7F77DD;cursor:pointer;text-decoration:underline;white-space:nowrap;background:none;border:none;font-family:inherit}
+
+/* PANTALLA PROFESIONAL */
+.main{padding:20px 24px 40px}
+.greeting{font-size:17px;font-weight:600;margin-bottom:4px}
+.greeting-sub{font-size:13px;color:#7A7870;margin-bottom:20px}
+.summary-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat{background:#fff;border:1px solid #E3E1D9;border-radius:10px;padding:14px}
+.stat-label{font-size:12px;color:#7A7870;margin-bottom:4px}
+.stat-value{font-size:22px;font-weight:600}
+.stat-value.green{color:#1D9E75}
+.prof-block{background:#fff;border:1px solid #E3E1D9;border-radius:12px;padding:16px;margin-bottom:12px}
+.prof-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.prof-title{font-size:15px;font-weight:600}
+.badge{font-size:11px;padding:3px 10px;border-radius:10px}
+.sched-wrap{overflow-x:auto}
+.sched-table{width:100%;border-collapse:collapse;font-size:12px}
+.sched-table th{background:#F5F4F0;color:#7A7870;font-weight:500;padding:7px 10px;text-align:left;border:1px solid #E3E1D9}
+.sched-table td{padding:6px 10px;border:1px solid #F0EEE8;vertical-align:middle;min-width:130px}
+.hora-col{width:52px;font-size:11px;color:#7A7870;font-weight:500;white-space:nowrap}
+.slot-free{background:#E1F5EE;color:#0F6E56;border-radius:5px;padding:3px 10px;font-size:11px;font-weight:600;display:inline-block}
+.slot-occ{font-size:11px;color:#5A5955;line-height:1.4}
+.legend{display:flex;gap:16px;margin-top:14px;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#7A7870}
+.leg-dot{width:12px;height:12px;border-radius:3px}
+
+/* PANTALLA ADMIN */
+.tabs{display:flex;gap:4px;border-bottom:1px solid #E3E1D9;margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:10px 18px;font-size:13px;cursor:pointer;border-radius:6px 6px 0 0;color:#7A7870;border:1px solid transparent;border-bottom:none;background:transparent;font-family:inherit}
+.tab.active{color:#1A1A18;background:#fff;border-color:#E3E1D9;font-weight:500}
+.panel{display:none}.panel.active{display:block}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
+.toolbar select,.toolbar input{font-size:13px;height:34px;padding:0 10px;border:1px solid #E3E1D9;border-radius:8px;background:#fff;color:#1A1A18;font-family:inherit}
+.toolbar input{width:200px}
+.reload-btn{padding:7px 14px;border:1px solid #E3E1D9;border-radius:8px;background:#fff;color:#7A7870;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.reload-btn:hover{background:#F5F4F0;border-color:#A8A4E8;color:#5A5955}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.card{background:#fff;border:1px solid #E3E1D9;border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:#A8A4E8}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px}
+.card-name{font-size:14px;font-weight:500;line-height:1.3}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.dia-label{font-size:12px;color:#7A7870;width:74px;flex-shrink:0}
+.bar-wrap{flex:1;height:7px;background:#F0EEE8;border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px}
+.bar-count{font-size:12px;color:#7A7870;width:28px;text-align:right;flex-shrink:0}
+.total-chip{display:inline-flex;font-size:12px;font-weight:500;padding:3px 10px;border-radius:10px;margin-top:7px}
+.expand-panel{display:none;margin-top:10px;border-top:1px solid #F0EEE8;padding-top:10px}
+.expand-panel.open{display:block}
+.horas-grid{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.hora-chip{font-size:11px;padding:2px 7px;border-radius:6px;background:#F5F4F0;color:#7A7870;border:1px solid #E3E1D9}
+.combo-section{background:#fff;border:1px solid #E3E1D9;border-radius:12px;padding:18px 20px;margin-bottom:16px}
+.combo-qty-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.qty-btn{width:32px;height:32px;border:1px solid #E3E1D9;border-radius:8px;background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;font-family:inherit}
+.qty-btn:hover{background:#F5F4F0}
+.qty-val{font-size:15px;font-weight:600;min-width:24px;text-align:center}
+.disciplines-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+.disc-row{display:flex;flex-direction:column;gap:4px}
+.disc-label{font-size:11px;color:#7A7870;font-weight:500}
+.disc-select{font-size:12px;height:34px;padding:0 8px;border:1px solid #E3E1D9;border-radius:8px;background:#fff;color:#1A1A18;font-family:inherit;width:100%}
+.disc-select.filled{border-color:#A8A4E8}
+.combo-footer{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.combo-turno{font-size:12px;height:34px;padding:0 10px;border:1px solid #E3E1D9;border-radius:8px;background:#fff;color:#1A1A18;font-family:inherit}
+.btn-search{padding:8px 20px;background:#7F77DD;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit}
+.btn-search:hover{background:#6B63C9}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:16px}
+.result-card{background:#fff;border:1px solid #E3E1D9;border-radius:12px;padding:14px 16px}
+.result-card.best{border:2px solid #5DCAA5}
+.best-label{display:inline-block;font-size:11px;padding:2px 8px;border-radius:8px;background:#E1F5EE;color:#0F6E56;margin-bottom:8px}
+.result-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-size:13px}
+.result-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.result-day{font-weight:500;min-width:72px}
+.result-time{color:#7A7870;font-size:12px}
+.result-prof-txt{font-size:11px;color:#7A7870;margin-top:1px}
+.days-summary{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.day-pill{font-size:11px;padding:2px 8px;border-radius:8px;background:#F5F4F0;color:#7A7870}
+.empty{text-align:center;padding:3rem;color:#7A7870;font-size:13px}
+.warn-box{background:#FAEEDA;border:1px solid #EF9F27;border-radius:8px;padding:10px 14px;font-size:12px;color:#854F0B;margin-top:12px}
+.updated-tag{font-size:11px;color:#7A7870;background:#F5F4F0;padding:3px 8px;border-radius:6px}
+</style>
+</head>
+<body>
+
+<!-- PANTALLA 1: CARGA DE ARCHIVO -->
+<div class="screen active" id="screen-upload">
+  <div class="upload-wrap">
+    <div class="upload-box">
+      <div class="upload-icon">📋</div>
+      <div class="upload-title">RehabTurnos <span style="color:#7F77DD">GEA</span> 2026</div>
+      <div class="upload-sub">Subí el archivo Excel para cargar los datos actualizados de turnos.</div>
+      <div class="drop-area" id="dropArea">
+        <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+        <div class="drop-area-txt">📂 Arrastrá el archivo aquí o hacé clic para seleccionarlo</div>
+        <button class="drop-btn" type="button" onclick="document.getElementById('fileInput').click()">Seleccionar archivo .xlsx</button>
+      </div>
+      <div class="upload-error" id="uploadError"></div>
+      <div class="steps">
+        <div class="step"><span class="step-num">1</span><span>Abrí el archivo Excel en SharePoint/OneDrive y guardalo localmente (Archivo → Guardar copia).</span></div>
+        <div class="step"><span class="step-num">2</span><span>Subilo acá. La app lee las hojas <strong>BASE DE CARGA</strong> y <strong>HORARIOS</strong> automáticamente.</span></div>
+        <div class="step"><span class="step-num">3</span><span>Los datos se actualizan al instante. Podés volver a cargar el archivo cuando quieras.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA 2: LOGIN PIN -->
+<div class="screen" id="screen-login">
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="login-logo">Rehab<span>Turnos</span> 2026</div>
+      <div class="login-sub">Ingresá tu PIN para ver tu turnero</div>
+      <div class="file-info-bar" id="fileInfoBar">
+        <span><span class="file-dot"></span><span id="fileInfoTxt">Archivo cargado</span></span>
+        <button class="reload-link" onclick="goReload()">🔄 Actualizar datos</button>
+      </div>
+      <div class="pin-display" id="pinDisplay">
+        <div class="pin-digit active" id="d0">_</div>
+        <div class="pin-digit" id="d1">_</div>
+        <div class="pin-digit" id="d2">_</div>
+        <div class="pin-digit" id="d3">_</div>
+      </div>
+      <div class="pin-keypad">
+        <button class="key" onclick="addDigit('1')">1</button>
+        <button class="key" onclick="addDigit('2')">2</button>
+        <button class="key" onclick="addDigit('3')">3</button>
+        <button class="key" onclick="addDigit('4')">4</button>
+        <button class="key" onclick="addDigit('5')">5</button>
+        <button class="key" onclick="addDigit('6')">6</button>
+        <button class="key" onclick="addDigit('7')">7</button>
+        <button class="key" onclick="addDigit('8')">8</button>
+        <button class="key" onclick="addDigit('9')">9</button>
+        <button class="key empty"></button>
+        <button class="key" onclick="addDigit('0')">0</button>
+        <button class="key del" onclick="delDigit()">⌫</button>
+      </div>
+      <div class="pin-error" id="pinError">PIN incorrecto. Intentá de nuevo.</div>
+      <div class="pin-hint">¿No tenés tu PIN? Contactá a coordinación.</div>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA 3: TURNERO INDIVIDUAL -->
+<div class="screen" id="screen-prof">
+  <div class="topbar">
+    <div class="logo">Rehab<span>Turnos</span> 2026</div>
+    <div class="top-right">
+      <span class="prof-chip" id="profChip"></span>
+      <span class="updated-tag" id="profUpdated"></span>
+      <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="greeting" id="profGreeting"></div>
+    <div class="greeting-sub" id="profSub"></div>
+    <div class="summary-bar" id="profSummary"></div>
+    <div id="profCronograma"></div>
+  </div>
+</div>
+
+<!-- PANTALLA 4: ADMIN -->
+<div class="screen" id="screen-admin">
+  <div class="topbar">
+    <div class="logo">Rehab<span>Turnos</span> 2026</div>
+    <div class="top-right">
+      <span class="updated-tag" id="adminUpdated"></span>
+      <span class="prof-chip" style="background:#E1F5EE;color:#0F6E56;border:1px solid #5DCAA5">👩‍💼 Coordinación</span>
+      <button class="reload-link" onclick="goReload()" style="font-size:12px">🔄 Actualizar datos</button>
+      <button class="logout-btn" onclick="doLogout()">Cerrar sesión</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('disponibles',this)">Lugares libres</div>
+      <div class="tab" onclick="switchTab('cronograma',this)">Cronograma</div>
+      <div class="tab" onclick="switchTab('combinador',this)">Combinador</div>
+    </div>
+    <div class="panel active" id="panel-disponibles">
+      <div class="toolbar">
+        <input type="text" id="sd" placeholder="Buscar profesional..." oninput="renderDisp()">
+        <select id="svd" onchange="renderDisp()"><option value="">Todas las disciplinas</option></select>
+        <select id="did" onchange="renderDisp()"><option value="">Todos los días</option><option>Lunes</option><option>Martes</option><option>Miercoles</option><option>Jueves</option><option>Viernes</option></select>
+        <select id="tud" onchange="renderDisp()"><option value="">Mañana + tarde</option><option value="manana">Solo mañana (hasta 13h)</option><option value="tarde">Solo tarde (14h o más)</option></select>
+      </div>
+      <div class="summary-bar" id="sum-d"></div>
+      <div class="grid" id="grid-d"></div>
+    </div>
+    <div class="panel" id="panel-cronograma">
+      <div class="toolbar">
+        <input type="text" id="sc" placeholder="Buscar profesional..." oninput="renderCron()">
+        <select id="svc" onchange="renderCron()"><option value="">Todas las disciplinas</option></select>
+        <select id="dic" onchange="renderCron()"><option value="">Todos los días</option><option>Lunes</option><option>Martes</option><option>Miercoles</option><option>Jueves</option><option>Viernes</option></select>
+      </div>
+      <div id="cron-list"></div>
+    </div>
+    <div class="panel" id="panel-combinador">
+      <div class="combo-section">
+        <div style="font-size:13px;font-weight:600;margin-bottom:14px">Configurar búsqueda de combinaciones</div>
+        <div class="combo-qty-row">
+          <span style="font-size:13px;color:#7A7870">Cantidad de disciplinas:</span>
+          <button class="qty-btn" onclick="changeQty(-1)">−</button>
+          <span class="qty-val" id="qtyVal">3</span>
+          <button class="qty-btn" onclick="changeQty(1)">+</button>
+          <span style="font-size:12px;color:#7A7870">(mín 2, máx 7)</span>
+        </div>
+        <div class="disciplines-grid" id="disciplinesGrid"></div>
+        <div class="combo-footer">
+          <select class="combo-turno" id="tuc"><option value="">Cualquier turno</option><option value="manana">Solo mañana</option><option value="tarde">Solo tarde</option></select>
+          <button class="btn-search" onclick="renderCombos()">Buscar combinaciones</button>
+          <span style="font-size:12px;color:#7A7870" id="cc"></span>
+        </div>
+        <div class="warn-box" id="warnBox" style="display:none">⚠️ Con 5+ disciplinas puede tardar unos segundos.</div>
+      </div>
+      <div id="combo-results"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== PINs =====================
+const PINS={
+  '2824':'ALMADA Luciana','1409':'ANSELMI Juliana Lourdes','5506':'ARANDA Karina Alejandra',
+  '5012':'ARMOA  Andrea Celeste','4657':'BARRIA VAZQUEZ Luciana ALicia','3286':'BASUALDO Candela Ariadna',
+  '2679':'BENEDETTO Andres Esteban','9935':'BRZOZOWSKI Joanna Valentina','2424':'CASTAGNO Melina Eliana',
+  '7912':'CASTRO Lucia Macarena','1520':'CHIESA Gisella Erica Roxana','1488':'COLINA Gloria Sofia',
+  '2535':'CONDORI Jose Hugo','4582':'CORTEZ Carolina Anahi','4811':'CRIADO Sabrina Tamara',
+  '9279':'CUELLO Florencia Patricia','1434':'DIAZ NIEVAS Andrea Celeste','4257':'DOMINGUEZ Mercedes Lorena',
+  '9928':'FERNANDEZ Maria Emilia','7873':'FERNANDEZ WOLFF Katerin','4611':'FERREYRA Jennifer Magali',
+  '8359':'FLEIDERMAN Paula','5557':'GARCIA Nadia','1106':'GIMENEZ Agustina',
+  '3615':'GIRAUDO MILAGROS VIRGINIA','7924':'GOMEZ MARTINA Carolina','6574':'HEREDIA LIZARAZU Lucia',
+  '5552':'LAZO  Ana Magdalena','3547':'LEMA Luz Candela','4527':'LORENZATTO Delfina Maria',
+  '6514':'MARTINEZ Lucas','2674':'MENDEZ Alejandra Carolina','2519':'MOLINA BRENDA',
+  '7224':'OCHOA Claudia Edith','2584':'OLOCCO Maria Gabriela','6881':'PAPA ARTERO Eimi Luhué',
+  '6635':'PEPELLIN Maria de los  Angeles','5333':'PEREZ Paula Belen','1711':'PETANAS Sofia Milagros',
+  '8527':'PIZZOLA Martin','9785':'PORTA Valentina','3045':'QUINTEROS Julieta',
+  '7201':'ROMANO Lourdes Rocio','2291':'SANCHEZ Maria Elisa','5803':'TOLEDO Sofia del Milagro',
+  '6925':'TORCIVIA RUARTE Damaris Agustina','4150':'TORRES Sofia','2139':'VALDANO MAINGUYAGUE Maria Agustina',
+  '1750':'VEGA Graciela Susana','4733':'VILCHE Carla Valeria','5741':'ZUÑIGA Lara Rosario',
+  '2307':'de MEDEIROS Micaela','9001':'__admin__'
+};
+
+const SC={
+  'Fonoaudiologia':{bg:'#E6F1FB',txt:'#0C447C',brd:'#85B7EB',dot:'#378ADD'},
+  'Fonoaudiología':{bg:'#E6F1FB',txt:'#0C447C',brd:'#85B7EB',dot:'#378ADD'},
+  'Psicologia':{bg:'#EEEDFE',txt:'#3C3489',brd:'#AFA9EC',dot:'#7F77DD'},
+  'Psicología':{bg:'#EEEDFE',txt:'#3C3489',brd:'#AFA9EC',dot:'#7F77DD'},
+  'Psicomotricidad':{bg:'#FAEEDA',txt:'#854F0B',brd:'#EF9F27',dot:'#BA7517'},
+  'Psicopedagogia':{bg:'#E1F5EE',txt:'#0F6E56',brd:'#5DCAA5',dot:'#1D9E75'},
+  'Psicopedagogía':{bg:'#E1F5EE',txt:'#0F6E56',brd:'#5DCAA5',dot:'#1D9E75'},
+  'Kinesiologia':{bg:'#FAECE7',txt:'#993C1D',brd:'#F0997B',dot:'#D85A30'},
+  'Kinesiología':{bg:'#FAECE7',txt:'#993C1D',brd:'#F0997B',dot:'#D85A30'},
+  'Terapia Ocupacional':{bg:'#FBEAF0',txt:'#993556',brd:'#ED93B1',dot:'#D4537E'},
+};
+const DIAS=['Lunes','Martes','Miercoles','Jueves','Viernes'];
+const DO={Lunes:0,Martes:1,Miercoles:2,Jueves:3,Viernes:4};
+const ALL_H=['08:00','08:45','09:30','10:45','11:30','12:15','13:00','14:00','14:45','15:30','16:15','17:30','18:15','19:00'];
+
+let DATA=[];let EXP=new Set();let QTY=3;let PIN_ENTERED='';
+let LOADED_FILENAME='';let LOADED_AT='';
+
+// ===================== UTILS =====================
+function col(s){return SC[s]||{bg:'#F5F4F0',txt:'#5A5955',brd:'#C8C6BE',dot:'#888'};}
+function fH(h,t){if(!t)return h;return h.filter(x=>{const hr=parseInt(x);return t==='manana'?hr<14:hr>=14;});}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function timeToStr(v){
+  if(!v&&v!==0)return null;
+  if(v instanceof Date)return String(v.getHours()).padStart(2,'0')+':'+String(v.getMinutes()).padStart(2,'0');
+  if(typeof v==='number'){const t=Math.round(v*24*60);return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');}
+  if(typeof v==='string'){const m=v.match(/(\d{1,2}):(\d{2})/);if(m)return m[1].padStart(2,'0')+':'+m[2];}
+  return null;
+}
+function goReload(){showScreen('screen-upload');}
+
+// ===================== DRAG & DROP =====================
+const dropArea=document.getElementById('dropArea');
+dropArea.addEventListener('dragover',e=>{e.preventDefault();dropArea.classList.add('over');});
+dropArea.addEventListener('dragleave',()=>dropArea.classList.remove('over'));
+dropArea.addEventListener('drop',e=>{e.preventDefault();dropArea.classList.remove('over');const f=e.dataTransfer.files[0];if(f)handleFile(f);});
+
+// ===================== LEER EXCEL =====================
+function handleFile(file){
+  if(!file)return;
+  if(!file.name.match(/\.xlsx?$/i)){
+    showErr('El archivo debe ser .xlsx o .xls');return;
+  }
+  const err=document.getElementById('uploadError');
+  err.style.display='none';
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      // Buscar hojas por nombre (flexible)
+      const nameBC=wb.SheetNames.find(n=>n.toUpperCase().includes('CARGA'));
+      const nameH=wb.SheetNames.find(n=>n.toUpperCase()==='HORARIOS');
+      if(!nameBC) throw new Error('No se encontró la hoja BASE DE CARGA. Hojas disponibles: '+wb.SheetNames.join(', '));
+      if(!nameH) throw new Error('No se encontró la hoja HORARIOS. Hojas disponibles: '+wb.SheetNames.join(', '));
+      const baseCarga=XLSX.utils.sheet_to_json(wb.Sheets[nameBC],{defval:''});
+      const horarios=XLSX.utils.sheet_to_json(wb.Sheets[nameH],{defval:''});
+      if(!horarios.length) throw new Error('La hoja HORARIOS está vacía.');
+      DATA=processData(baseCarga,horarios);
+      LOADED_FILENAME=file.name;
+      LOADED_AT=new Date().toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      document.getElementById('fileInfoTxt').textContent=file.name+' · '+DATA.length+' profesionales';
+      document.getElementById('adminUpdated').textContent='Actualizado '+LOADED_AT;
+      document.getElementById('profUpdated').textContent='Datos al '+LOADED_AT;
+      populateAdminSelects();buildDiscGrid();
+      showScreen('screen-login');
+    }catch(ex){
+      showErr('Error al leer el archivo: '+ex.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function showErr(msg){const err=document.getElementById('uploadError');err.textContent=msg;err.style.display='block';}
+
+// ===================== PROCESAR DATOS =====================
+function processData(baseCarga,horarios){
+  // Detectar columnas dinámicamente
+  const avail={};
+  for(const row of horarios){
+    // Columna profesional: buscar variantes
+    const profKey=Object.keys(row).find(k=>k.toLowerCase().includes('apellido')||k.toLowerCase().includes('nombre')||k.toLowerCase()==='profesional')||Object.keys(row)[0];
+    const servKey=Object.keys(row).find(k=>k.toLowerCase().includes('servicio')||k.toLowerCase().includes('especialidad')||k.toLowerCase().includes('disciplina'))||Object.keys(row)[1];
+    const diaKey=Object.keys(row).find(k=>k.toLowerCase()==='dia'||k.toLowerCase()==='día')||Object.keys(row)[3];
+    // hora: buscar columna G (índice 6) o nombre con 'hora' o 'desde'
+    const horaKey=Object.keys(row).find(k=>k.toLowerCase().includes('desde hasta')||k.toLowerCase()==='g')||Object.keys(row).find(k=>k.toLowerCase().includes('hora')&&!k.toLowerCase().includes('inicio')&&!k.toLowerCase().includes('fin'))||Object.keys(row)[6];
+
+    const prof=(row[profKey]||'').toString().trim();
+    const serv=(row[servKey]||'').toString().trim();
+    const dia=(row[diaKey]||'').toString().trim();
+    const hora=timeToStr(row[horaKey]);
+    if(!prof||!dia||!hora)continue;
+    if(!avail[prof])avail[prof]={servicio:serv,dias:{}};
+    if(!avail[prof].dias[dia])avail[prof].dias[dia]=new Set();
+    avail[prof].dias[dia].add(hora);
+  }
+
+  const occ={};
+  for(const row of baseCarga){
+    const profKey=Object.keys(row).find(k=>k.toLowerCase()==='profesional')||Object.keys(row)[4];
+    const diaKey=Object.keys(row).find(k=>k.toLowerCase()==='dia'||k.toLowerCase()==='día')||Object.keys(row)[5];
+    const horaKey=Object.keys(row).find(k=>k.toLowerCase()==='hora')||Object.keys(row)[6];
+    const pacKey=Object.keys(row).find(k=>k.toLowerCase().includes('paciente'))||'';
+
+    const prof=(row[profKey]||'').toString().trim();
+    const dia=(row[diaKey]||'').toString().trim();
+    const hora=timeToStr(row[horaKey]);
+    const pac=pacKey?(row[pacKey]||'').toString().trim():'Paciente';
+    if(!prof||!dia||!hora)continue;
+    if(!avail[prof])continue;
+    if(!occ[prof])occ[prof]={};
+    if(!occ[prof][dia])occ[prof][dia]={};
+    if(!occ[prof][dia][hora])occ[prof][dia][hora]=[];
+    occ[prof][dia][hora].push(pac||'Paciente');
+  }
+
+  const result=[];
+  for(const prof in avail){
+    const{servicio,dias}=avail[prof];
+    const pd={profesional:prof,servicio,dias:[],total_libres:0};
+    for(const dia of DIAS){
+      if(!dias[dia])continue;
+      const allH=Array.from(dias[dia]).sort();
+      const occDia=occ[prof]&&occ[prof][dia]?occ[prof][dia]:{};
+      const occH=new Set(Object.keys(occDia));
+      const freeH=allH.filter(h=>!occH.has(h));
+      pd.dias.push({dia,total:allH.length,ocupados:occH.size,libres:freeH.length,horas_libres:freeH,pacientes:occDia});
+      pd.total_libres+=freeH.length;
+    }
+    // También días extra (Sábado, etc.)
+    const extraDias=Object.keys(dias).filter(d=>!DIAS.includes(d));
+    for(const dia of extraDias){
+      const allH=Array.from(dias[dia]).sort();
+      const occDia=occ[prof]&&occ[prof][dia]?occ[prof][dia]:{};
+      const occH=new Set(Object.keys(occDia));
+      const freeH=allH.filter(h=>!occH.has(h));
+      pd.dias.push({dia,total:allH.length,ocupados:occH.size,libres:freeH.length,horas_libres:freeH,pacientes:occDia});
+      pd.total_libres+=freeH.length;
+    }
+    let tot=0;const uniq=new Set();
+    for(const d of pd.dias)for(const[,pacs]of Object.entries(d.pacientes||{})){tot+=pacs.length;pacs.forEach(p=>{if(p.trim())uniq.add(p.trim());});}
+    pd.total_pacientes=tot;pd.pacientes_unicos=uniq.size;
+    result.push(pd);
+  }
+  return result.sort((a,b)=>b.total_libres-a.total_libres);
+}
+
+// ===================== PIN =====================
+function addDigit(d){
+  if(PIN_ENTERED.length>=4)return;
+  PIN_ENTERED+=d;updatePinDisplay();
+  document.getElementById('pinError').style.display='none';
+  if(PIN_ENTERED.length===4)setTimeout(checkPin,200);
+}
+function delDigit(){PIN_ENTERED=PIN_ENTERED.slice(0,-1);updatePinDisplay();document.getElementById('pinError').style.display='none';}
+function updatePinDisplay(){
+  for(let i=0;i<4;i++){
+    const el=document.getElementById('d'+i);
+    el.textContent=i<PIN_ENTERED.length?'●':'_';
+    el.className='pin-digit'+(i===PIN_ENTERED.length?' active':i<PIN_ENTERED.length?' filled':'');
+  }
+}
+function checkPin(){
+  const who=PINS[PIN_ENTERED];
+  if(!who){document.getElementById('pinError').style.display='block';PIN_ENTERED='';updatePinDisplay();return;}
+  if(who==='__admin__')showAdminScreen();else showProfScreen(who);
+}
+function doLogout(){PIN_ENTERED='';updatePinDisplay();document.getElementById('pinError').style.display='none';showScreen('screen-login');}
+
+// ===================== PANTALLA PROFESIONAL =====================
+function showProfScreen(profName){
+  // Buscar con matching flexible (sin importar espacios extra o mayúsculas)
+  const norm=s=>s.toLowerCase().replace(/\s+/g,' ').trim();
+  const profData=DATA.find(p=>norm(p.profesional)===norm(profName))||DATA.find(p=>norm(p.profesional).includes(norm(profName.split(' ')[0])));
+  const c=profData?col(profData.servicio):{bg:'#F5F4F0',txt:'#5A5955',brd:'#C8C6BE'};
+  document.getElementById('profChip').innerHTML=`<span style="background:${c.bg};color:${c.txt};border:1px solid ${c.brd};padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500">${profName}</span>`;
+  document.getElementById('profGreeting').textContent='Hola, '+profName.split(' ')[0]+' 👋';
+  document.getElementById('profSub').textContent=(profData?profData.servicio:'')+' — Tu turnero semanal';
+  if(!profData){
+    document.getElementById('profSummary').innerHTML='';
+    document.getElementById('profCronograma').innerHTML='<div class="empty">No se encontraron datos para este profesional en el archivo cargado.<br><small>Verificá que tu nombre en el Excel coincida con el del sistema.</small></div>';
+    showScreen('screen-prof');return;
+  }
+  const totalOcc=profData.dias.reduce((s,d)=>s+d.ocupados,0);
+  const totalSlots=profData.dias.reduce((s,d)=>s+d.total,0);
+  document.getElementById('profSummary').innerHTML=`
+    <div class="stat"><div class="stat-label">Lugares libres</div><div class="stat-value green">${profData.total_libres}</div></div>
+    <div class="stat"><div class="stat-label">Pacientes</div><div class="stat-value">${profData.total_pacientes||0}</div></div>
+    <div class="stat"><div class="stat-label">Total horarios</div><div class="stat-value">${totalSlots}</div></div>`;
+  const diasProf=profData.dias.map(d=>d.dia);
+  const hdr='<th class="hora-col">Hora</th>'+diasProf.map(d=>`<th>${d}</th>`).join('');
+  const dd={};const pp={};
+  profData.dias.forEach(x=>{dd[x.dia]=new Set(x.horas_libres);pp[x.dia]=x.pacientes||{};});
+  const allHoras=[...new Set([...ALL_H,...profData.dias.flatMap(d=>[...d.horas_libres,...Object.keys(d.pacientes||{})])])].sort();
+  const rows=allHoras.map(h=>{
+    const hasF=diasProf.some(d=>dd[d]&&dd[d].has(h));
+    const hasO=diasProf.some(d=>pp[d]&&pp[d][h]);
+    if(!hasF&&!hasO)return'';
+    const cells=diasProf.map(d=>{
+      if(dd[d]&&dd[d].has(h))return`<td><span class="slot-free">✓ LIBRE</span></td>`;
+      if(pp[d]&&pp[d][h]){const names=pp[d][h].join(', ');return`<td><span class="slot-occ">${names}</span></td>`;}
+      return'<td style="color:#E3E1D9;text-align:center">—</td>';
+    }).join('');
+    return`<tr><td class="hora-col">${h}</td>${cells}</tr>`;
+  }).filter(Boolean).join('');
+  document.getElementById('profCronograma').innerHTML=`
+    <div class="prof-block">
+      <div class="prof-header">
+        <span class="prof-title">Mi cronograma semanal</span>
+        <span class="badge" style="background:${c.bg};color:${c.txt};border:1px solid ${c.brd}">${profData.servicio}</span>
+      </div>
+      <div class="sched-wrap"><table class="sched-table"><thead><tr>${hdr}</tr></thead><tbody>${rows||'<tr><td colspan="10" style="text-align:center;padding:20px;color:#7A7870">Sin turnos cargados aún</td></tr>'}</tbody></table></div>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-dot" style="background:#E1F5EE;border:1px solid #5DCAA5"></div>Lugar libre</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#F5F4F0;border:1px solid #E3E1D9"></div>Ocupado — nombre del paciente</div>
+      </div>
+    </div>`;
+  showScreen('screen-prof');
+}
+
+// ===================== PANTALLA ADMIN =====================
+function showAdminScreen(){renderDisp();renderCron();showScreen('screen-admin');}
+
+function populateAdminSelects(){
+  const servs=[...new Set(DATA.map(p=>p.servicio))].sort();
+  ['svd','svc'].forEach(id=>{
+    const sel=document.getElementById(id);
+    sel.innerHTML='<option value="">Todas las disciplinas</option>';
+    servs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+  });
+}
+
+function getF(sId,svId,dId,tId){
+  const q=document.getElementById(sId).value.toLowerCase();
+  const sv=document.getElementById(svId).value;
+  const d=dId?document.getElementById(dId).value:'';
+  const t=tId?document.getElementById(tId).value:'';
+  return DATA.map(p=>{
+    let dias=p.dias;
+    if(d)dias=dias.filter(x=>x.dia===d);
+    if(t)dias=dias.map(x=>({...x,horas_libres:fH(x.horas_libres,t),libres:fH(x.horas_libres,t).length}));
+    const tl=dias.reduce((s,x)=>s+x.libres,0);
+    return{...p,dias,total_libres:tl};
+  }).filter(p=>{
+    if(q&&!p.profesional.toLowerCase().includes(q))return false;
+    if(sv&&p.servicio!==sv)return false;
+    return p.total_libres>0;
+  });
+}
+
+function renderDisp(){
+  const f=getF('sd','svd','did','tud');
+  const tl=f.reduce((s,p)=>s+p.total_libres,0);
+  const conDisp=DATA.filter(p=>p.total_libres>0).length;
+  document.getElementById('sum-d').innerHTML=`
+    <div class="stat"><div class="stat-label">Profesionales con lugar libre</div><div class="stat-value">${f.length}</div></div>
+    <div class="stat"><div class="stat-label">Turnos libres totales</div><div class="stat-value">${tl}</div></div>
+    <div class="stat"><div class="stat-label">Total profesionales</div><div class="stat-value">${DATA.length}</div></div>`;
+  if(!f.length){document.getElementById('grid-d').innerHTML='<div class="empty">Sin resultados para el filtro seleccionado.</div>';return;}
+  document.getElementById('grid-d').innerHTML=f.map(p=>{
+    const c=col(p.servicio);const isE=EXP.has(p.profesional);
+    const bars=p.dias.filter(d=>d.libres>0).map(d=>`
+      <div class="bar-row"><span class="dia-label">${d.dia}</span>
+      <div class="bar-wrap"><div class="bar-fill" style="width:${d.total>0?Math.round(d.libres/d.total*100):0}%;background:${c.brd}"></div></div>
+      <span class="bar-count">${d.libres}</span></div>`).join('');
+    const det=p.dias.filter(d=>d.libres>0).map(d=>`
+      <div style="margin-bottom:8px"><div style="font-size:12px;font-weight:500;color:#7A7870;margin-bottom:4px">${d.dia}</div>
+      <div class="horas-grid">${d.horas_libres.map(h=>`<span class="hora-chip">${h}</span>`).join('')}</div></div>`).join('');
+    return`<div class="card" onclick="toggle('${p.profesional.replace(/'/g,"\\'")}')">
+      <div class="card-header"><span class="card-name">${p.profesional}</span><span class="badge" style="background:${c.bg};color:${c.txt};border:1px solid ${c.brd}">${p.servicio}</span></div>
+      ${bars}<span class="total-chip" style="background:${c.bg};color:${c.txt}">${p.total_libres} lugares libres</span>
+      <div class="expand-panel${isE?' open':''}"><div style="font-size:12px;font-weight:500;color:#7A7870;margin-bottom:8px">Horarios disponibles</div>${det}</div></div>`;
+  }).join('');
+}
+function toggle(p){if(EXP.has(p))EXP.delete(p);else EXP.add(p);renderDisp();}
+
+function renderCron(){
+  const q=document.getElementById('sc').value.toLowerCase();
+  const sv=document.getElementById('svc').value;
+  const d=document.getElementById('dic').value;
+  const ds=d?[d]:DIAS;
+  const f=DATA.filter(p=>{
+    if(q&&!p.profesional.toLowerCase().includes(q))return false;
+    if(sv&&p.servicio!==sv)return false;
+    return p.dias.some(x=>(!d||x.dia===d)&&(x.horas_libres.length>0||Object.keys(x.pacientes||{}).length>0));
+  });
+  document.getElementById('cron-list').innerHTML=f.map(p=>{
+    const c=col(p.servicio);const dd={};const pp={};
+    p.dias.forEach(x=>{dd[x.dia]=new Set(x.horas_libres);pp[x.dia]=x.pacientes||{};});
+    const diasUsados=d?[d]:p.dias.map(x=>x.dia);
+    const hdr='<th class="hora-col">Hora</th>'+diasUsados.map(x=>`<th>${x}</th>`).join('');
+    const allHoras=[...new Set([...ALL_H,...p.dias.flatMap(x=>[...x.horas_libres,...Object.keys(x.pacientes||{})])])].sort();
+    const rows=allHoras.map(h=>{
+      const hasF=diasUsados.some(x=>dd[x]&&dd[x].has(h));
+      const hasO=diasUsados.some(x=>pp[x]&&pp[x][h]);
+      if(!hasF&&!hasO)return'';
+      const cells=diasUsados.map(x=>{
+        if(dd[x]&&dd[x].has(h))return`<td><span class="slot-free" style="background:${c.bg};color:${c.txt}">${h}</span></td>`;
+        if(pp[x]&&pp[x][h])return`<td style="font-size:11px;color:#5A5955;line-height:1.4">${pp[x][h].join(', ')}</td>`;
+        return'<td></td>';
+      }).join('');
+      return`<tr><td class="hora-col">${h}</td>${cells}</tr>`;
+    }).filter(Boolean).join('');
+    if(!rows)return'';
+    return`<div class="prof-block">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:14px;font-weight:500">${p.profesional}</span>
+        <span class="badge" style="background:${c.bg};color:${c.txt};border:1px solid ${c.brd}">${p.servicio}</span>
+      </div>
+      <div class="sched-wrap"><table class="sched-table"><thead><tr>${hdr}</tr></thead><tbody>${rows}</tbody></table></div>
+    </div>`;
+  }).filter(Boolean).join('')||'<div class="empty">Sin resultados.</div>';
+}
+
+function switchTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');document.getElementById('panel-'+id).classList.add('active');
+  if(id==='cronograma')renderCron();
+}
+
+function changeQty(d){
+  QTY=Math.max(2,Math.min(7,QTY+d));
+  document.getElementById('qtyVal').textContent=QTY;
+  document.getElementById('warnBox').style.display=QTY>=5?'block':'none';
+  buildDiscGrid();
+}
+function buildDiscGrid(){
+  const servs=[...new Set(DATA.map(p=>p.servicio))].sort();
+  const defaults=['Psicologia','Fonoaudiologia','Terapia Ocupacional','Psicomotricidad','Psicopedagogia','Kinesiologia',''];
+  const grid=document.getElementById('disciplinesGrid');
+  const prev=[];grid.querySelectorAll('select').forEach(s=>prev.push(s.value));
+  grid.innerHTML='';
+  for(let i=0;i<QTY;i++){
+    const div=document.createElement('div');div.className='disc-row';
+    const lbl=document.createElement('label');lbl.className='disc-label';lbl.textContent='Disciplina '+(i+1);
+    const sel=document.createElement('select');sel.className='disc-select';sel.id='disc_'+i;
+    sel.innerHTML='<option value="">— elegir —</option>';
+    servs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+    const val=prev[i]||defaults[i]||'';if(val){const opt=[...sel.options].find(o=>o.value===val||o.value.toLowerCase().includes(val.toLowerCase()));if(opt)sel.value=opt.value;}
+    if(sel.value)sel.classList.add('filled');
+    sel.onchange=function(){this.classList.toggle('filled',!!this.value);};
+    div.appendChild(lbl);div.appendChild(sel);grid.appendChild(div);
+  }
+}
+function renderCombos(){
+  const turno=document.getElementById('tuc').value;
+  const el=document.getElementById('combo-results');
+  const selServs=[];
+  for(let i=0;i<QTY;i++){selServs.push(document.getElementById('disc_'+i)?.value||'');}
+  const filled=selServs.filter(s=>s!=='');
+  if(filled.length<2){el.innerHTML='<div class="empty">Seleccioná al menos 2 disciplinas.</div>';document.getElementById('cc').textContent='';return;}
+  if(new Set(filled).size<filled.length){el.innerHTML='<div class="empty">Las disciplinas deben ser distintas.</div>';return;}
+  const byServ={};
+  for(const s of filled){
+    byServ[s]=DATA.filter(p=>p.servicio===s).map(p=>({prof:p.profesional,serv:s,diasFilt:p.dias.map(d=>({dia:d.dia,horas:fH(d.horas_libres,turno)})).filter(d=>d.horas.length>0)})).filter(p=>p.diasFilt.length>0);
+  }
+  const sinDisp=filled.filter(s=>!byServ[s]||byServ[s].length===0);
+  if(sinDisp.length){el.innerHTML=`<div class="empty">Sin profesionales disponibles para: ${sinDisp.join(', ')}.</div>`;document.getElementById('cc').textContent='';return;}
+  el.innerHTML='<div class="empty">Buscando...</div>';document.getElementById('cc').textContent='';
+  setTimeout(()=>{
+    const combos=[];const seen=new Set();
+    function recurse(idx,current,usedDias){
+      if(idx===filled.length){
+        const key=current.map(x=>`${x.prof}|${x.dia}`).sort().join('::');
+        if(seen.has(key))return;seen.add(key);
+        combos.push({profs:[...current],tot:current.reduce((s,x)=>s+x.horas.length,0)});
+        return;
+      }
+      for(const p of byServ[filled[idx]]){
+        for(const df of p.diasFilt){
+          if(usedDias.has(df.dia))continue;
+          usedDias.add(df.dia);current.push({prof:p.prof,serv:filled[idx],dia:df.dia,horas:df.horas});
+          recurse(idx+1,current,usedDias);
+          current.pop();usedDias.delete(df.dia);
+          if(combos.length>2000)return;
+        }
+      }
+    }
+    recurse(0,[],new Set());
+    combos.sort((a,b)=>b.tot-a.tot);
+    document.getElementById('cc').textContent=combos.length+' combinaciones'+(combos.length>50?' (mostrando 50)':'');
+    if(!combos.length){el.innerHTML='<div class="empty">Sin combinaciones disponibles.</div>';return;}
+    el.innerHTML=`<div class="result-grid">${combos.slice(0,50).map((c,i)=>{
+      const best=i===0;
+      const rows=c.profs.sort((a,b)=>(DO[a.dia]??9)-(DO[b.dia]??9)).map(p=>`
+        <div class="result-row"><div class="result-dot" style="background:${(SC[p.serv]||{dot:'#888'}).dot}"></div>
+        <div><div><span class="result-day">${p.dia}</span> <span class="result-time">${p.horas.join(', ')}</span></div>
+        <div class="result-prof-txt">${p.prof} · ${p.serv}</div></div></div>`).join('');
+      const pills=c.profs.sort((a,b)=>(DO[a.dia]??9)-(DO[b.dia]??9)).map(p=>`<span class="day-pill">${p.dia}</span>`).join('');
+      return`<div class="result-card${best?' best':''}">
+        ${best?'<div class="best-label">✓ Mayor disponibilidad</div>':''}
+        ${rows}<div class="days-summary">${pills}</div></div>`;
+    }).join('')}</div>`;
+  },50);
+}
+</script>
+</body>
+</html>
