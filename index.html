@@ -250,6 +250,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
           <span style="font-size:12px;color:#7A7870">(mín 2, máx 7)</span>
         </div>
         <div class="disciplines-grid" id="disciplinesGrid"></div>
+        <div class="combo-qty-row" style="background:#F5F4FE;border-radius:8px;padding:10px 14px;margin-bottom:14px">
+          <span style="font-size:13px;color:#1A1A18;font-weight:500">⏱️ Ventana máxima en el día:</span>
+          <input type="range" id="vWin" min="1" max="6" step="0.5" value="3" oninput="document.getElementById('vWinLbl').textContent=this.value+' h'" style="flex:1;min-width:120px;max-width:240px;accent-color:#7F77DD">
+          <span class="qty-val" id="vWinLbl" style="min-width:48px;text-align:center">3 h</span>
+        </div>
+        <div style="font-size:11px;color:#7A7870;margin-bottom:14px;line-height:1.5">
+          Cada turno = <b>1 sesión de 45 min</b>. Los turnos del paciente caerán <b>todos el mismo día</b>, con al menos 45 min entre uno y otro, y con duración total del día dentro de la ventana indicada.
+        </div>
         <div class="combo-footer">
           <select class="combo-turno" id="tuc"><option value="">Cualquier turno</option><option value="manana">Solo mañana</option><option value="tarde">Solo tarde</option></select>
           <button class="btn-search" onclick="renderCombos()">Buscar combinaciones</button>
@@ -628,52 +636,142 @@ function buildDiscGrid(){
 }
 function renderCombos(){
   const turno=document.getElementById('tuc').value;
+  const winH=parseFloat(document.getElementById('vWin').value); // ventana en horas
+  const winMin=winH*60;
   const el=document.getElementById('combo-results');
   const selServs=[];
   for(let i=0;i<QTY;i++){selServs.push(document.getElementById('disc_'+i)?.value||'');}
   const filled=selServs.filter(s=>s!=='');
   if(filled.length<2){el.innerHTML='<div class="empty">Seleccioná al menos 2 disciplinas.</div>';document.getElementById('cc').textContent='';return;}
   if(new Set(filled).size<filled.length){el.innerHTML='<div class="empty">Las disciplinas deben ser distintas.</div>';return;}
-  const byServ={};
+
+  // Helper: "09:30" -> 570 (minutos desde 00:00)
+  const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+(m||0);};
+
+  // Para cada disciplina, indexar por día: {dia -> [{prof, horasMin:[..]}]}
+  // Sólo conservamos profesionales que tengan al menos un turno libre ese día (con el filtro mañana/tarde)
+  const byServDay={};
   for(const s of filled){
-    byServ[s]=DATA.filter(p=>p.servicio===s).map(p=>({prof:p.profesional,serv:s,diasFilt:p.dias.map(d=>({dia:d.dia,horas:fH(d.horas_libres,turno)})).filter(d=>d.horas.length>0)})).filter(p=>p.diasFilt.length>0);
-  }
-  const sinDisp=filled.filter(s=>!byServ[s]||byServ[s].length===0);
-  if(sinDisp.length){el.innerHTML=`<div class="empty">Sin profesionales disponibles para: ${sinDisp.join(', ')}.</div>`;document.getElementById('cc').textContent='';return;}
-  el.innerHTML='<div class="empty">Buscando...</div>';document.getElementById('cc').textContent='';
-  setTimeout(()=>{
-    const combos=[];const seen=new Set();
-    function recurse(idx,current,usedDias){
-      if(idx===filled.length){
-        const key=current.map(x=>`${x.prof}|${x.dia}`).sort().join('::');
-        if(seen.has(key))return;seen.add(key);
-        combos.push({profs:[...current],tot:current.reduce((s,x)=>s+x.horas.length,0)});
-        return;
-      }
-      for(const p of byServ[filled[idx]]){
-        for(const df of p.diasFilt){
-          if(usedDias.has(df.dia))continue;
-          usedDias.add(df.dia);current.push({prof:p.prof,serv:filled[idx],dia:df.dia,horas:df.horas});
-          recurse(idx+1,current,usedDias);
-          current.pop();usedDias.delete(df.dia);
-          if(combos.length>2000)return;
-        }
+    byServDay[s]={};
+    for(const p of DATA.filter(x=>x.servicio===s)){
+      for(const d of p.dias){
+        const horas=fH(d.horas_libres,turno);
+        if(!horas.length)continue;
+        if(!byServDay[s][d.dia])byServDay[s][d.dia]=[];
+        byServDay[s][d.dia].push({prof:p.profesional,horasMin:horas.map(toMin).sort((a,b)=>a-b),horasStr:horas.slice().sort()});
       }
     }
-    recurse(0,[],new Set());
-    combos.sort((a,b)=>b.tot-a.tot);
-    document.getElementById('cc').textContent=combos.length+' combinaciones'+(combos.length>50?' (mostrando 50)':'');
-    if(!combos.length){el.innerHTML='<div class="empty">Sin combinaciones disponibles.</div>';return;}
-    el.innerHTML=`<div class="result-grid">${combos.slice(0,50).map((c,i)=>{
+  }
+
+  // Días candidatos: aquellos donde TODAS las disciplinas tienen al menos un profesional con turnos
+  const sinDispGlobal=filled.filter(s=>Object.keys(byServDay[s]).length===0);
+  if(sinDispGlobal.length){el.innerHTML=`<div class="empty">Sin profesionales disponibles para: ${sinDispGlobal.join(', ')}.</div>`;document.getElementById('cc').textContent='';return;}
+  const diasComunes=Object.keys(byServDay[filled[0]]).filter(d=>filled.every(s=>byServDay[s][d]));
+  if(!diasComunes.length){el.innerHTML='<div class="empty">No hay un día en común donde todas las disciplinas tengan profesionales con turnos libres.</div>';document.getElementById('cc').textContent='';return;}
+
+  el.innerHTML='<div class="empty">Buscando...</div>';document.getElementById('cc').textContent='';
+  setTimeout(()=>{
+    const combos=[];
+    const MAX=2000;
+
+    // Para cada día candidato, buscar combinaciones que cumplan la ventana
+    // Estrategia: recursión por disciplina, eligiendo (profesional, horario) que respete la ventana acumulada
+    for(const dia of diasComunes){
+      // Para cada disciplina en orden, listar candidatos (prof, horaMin, horaStr)
+      const candPorDisc=filled.map(s=>{
+        const out=[];
+        for(const p of byServDay[s][dia]){
+          for(let i=0;i<p.horasMin.length;i++){
+            out.push({prof:p.prof,serv:s,min:p.horasMin[i],hora:p.horasStr[i]});
+          }
+        }
+        // Ordenar por horario asc para que las primeras combos exploradas sean más tempranas
+        return out.sort((a,b)=>a.min-b.min);
+      });
+
+      function recurse(idx,picked,profsUsados){
+        if(combos.length>=MAX)return;
+        if(idx===filled.length){
+          // Verificar las reglas sobre el conjunto picked
+          const minutos=picked.map(x=>x.min).sort((a,b)=>a-b);
+          // Regla 1: ventana total
+          if(minutos[minutos.length-1]-minutos[0]>winMin)return;
+          // Regla 2: gap consecutivo no mayor a la ventana
+          for(let i=1;i<minutos.length;i++){
+            if(minutos[i]-minutos[i-1]>winMin)return;
+          }
+          // Regla 3: separación mínima de 45 min entre cualquier par (sesión de 45')
+          for(let i=1;i<minutos.length;i++){
+            if(minutos[i]-minutos[i-1]<45)return;
+          }
+          combos.push({dia,turnos:picked.slice()});
+          return;
+        }
+        for(const c of candPorDisc[idx]){
+          // Evitar mismo profesional+servicio repetido (raro, pero por seguridad)
+          if(profsUsados.has(c.prof+'|'+c.serv))continue;
+          // Poda: chequear ventana total y separación 45' contra los ya pickeados
+          let ok=true;
+          if(picked.length){
+            const mn=Math.min(c.min,...picked.map(x=>x.min));
+            const mx=Math.max(c.min,...picked.map(x=>x.min));
+            if(mx-mn>winMin){ok=false;}
+            else{
+              for(const p of picked){if(Math.abs(p.min-c.min)<45){ok=false;break;}}
+            }
+          }
+          if(!ok)continue;
+          profsUsados.add(c.prof+'|'+c.serv);
+          picked.push(c);
+          recurse(idx+1,picked,profsUsados);
+          picked.pop();
+          profsUsados.delete(c.prof+'|'+c.serv);
+          if(combos.length>=MAX)return;
+        }
+      }
+      recurse(0,[],new Set());
+      if(combos.length>=MAX)break;
+    }
+
+    // Deduplicar (mismo día + mismos prof+hora en cualquier orden)
+    const seen=new Set();
+    const unicos=[];
+    for(const c of combos){
+      const key=c.dia+'::'+c.turnos.map(t=>t.prof+'|'+t.serv+'|'+t.hora).sort().join('//');
+      if(seen.has(key))continue;
+      seen.add(key);
+      unicos.push(c);
+    }
+
+    // Ordenar: primero las de menor ventana total (más compactas), después por día
+    unicos.forEach(c=>{
+      const mins=c.turnos.map(t=>t.min);
+      c.ventanaMin=Math.max(...mins)-Math.min(...mins);
+    });
+    unicos.sort((a,b)=>{
+      if(a.ventanaMin!==b.ventanaMin)return a.ventanaMin-b.ventanaMin;
+      return (DO[a.dia]??9)-(DO[b.dia]??9);
+    });
+
+    document.getElementById('cc').textContent=unicos.length+' combinaciones'+(unicos.length>50?' (mostrando 50)':'');
+    if(!unicos.length){
+      el.innerHTML=`<div class="empty">Sin combinaciones que entren en una ventana de ${winH} h en un mismo día.<br><small style="color:#7A7870">Probá ampliar la ventana con el deslizador o quitar el filtro mañana/tarde.</small></div>`;
+      return;
+    }
+
+    el.innerHTML=`<div class="result-grid">${unicos.slice(0,50).map((c,i)=>{
       const best=i===0;
-      const rows=c.profs.sort((a,b)=>(DO[a.dia]??9)-(DO[b.dia]??9)).map(p=>`
+      const ventH=(c.ventanaMin/60);
+      const ventLbl=c.turnos.length===1?'1 turno':`ventana ${ventH===Math.floor(ventH)?ventH:ventH.toFixed(1)} h`;
+      // Ordenar turnos por hora dentro del día
+      const ordenados=c.turnos.slice().sort((a,b)=>a.min-b.min);
+      const rows=ordenados.map(p=>`
         <div class="result-row"><div class="result-dot" style="background:${(SC[p.serv]||{dot:'#888'}).dot}"></div>
-        <div><div><span class="result-day">${p.dia}</span> <span class="result-time">${p.horas.join(', ')}</span></div>
+        <div><div><span class="result-day">${c.dia}</span> <span class="result-time">${p.hora}</span></div>
         <div class="result-prof-txt">${p.prof} · ${p.serv}</div></div></div>`).join('');
-      const pills=c.profs.sort((a,b)=>(DO[a.dia]??9)-(DO[b.dia]??9)).map(p=>`<span class="day-pill">${p.dia}</span>`).join('');
       return`<div class="result-card${best?' best':''}">
-        ${best?'<div class="best-label">✓ Mayor disponibilidad</div>':''}
-        ${rows}<div class="days-summary">${pills}</div></div>`;
+        ${best?'<div class="best-label">✓ Más compacta</div>':''}
+        ${rows}<div class="days-summary"><span class="day-pill">${c.dia}</span><span class="day-pill" style="background:#F5F4FE;color:#7F77DD">${ventLbl}</span></div></div>`;
     }).join('')}</div>`;
   },50);
 }
